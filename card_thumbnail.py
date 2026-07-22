@@ -63,7 +63,7 @@ def make_thumbnail(
     ss = SUPERSAMPLE
     cw, ch = CANVAS_W * ss, CANVAS_H * ss
     MX = SIDE_MARGIN * ss
-
+   
     # ── 0) 입력 텍스트 정리 (줄바꿈/빈줄 제거로 렌더 에러 방지) ──
     # title_lines 안에 \n 이 들어오면 한 줄에 여러 줄이 섞여 폭 측정이 실패한다.
     # 각 원소의 줄바꿈을 공백으로 바꾸고, 빈 줄은 버린다.
