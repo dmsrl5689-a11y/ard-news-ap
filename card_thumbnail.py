@@ -64,6 +64,22 @@ def make_thumbnail(
     cw, ch = CANVAS_W * ss, CANVAS_H * ss
     MX = SIDE_MARGIN * ss
 
+    # ── 0) 입력 텍스트 정리 (줄바꿈/빈줄 제거로 렌더 에러 방지) ──
+    # title_lines 안에 \n 이 들어오면 한 줄에 여러 줄이 섞여 폭 측정이 실패한다.
+    # 각 원소의 줄바꿈을 공백으로 바꾸고, 빈 줄은 버린다.
+    clean_lines = []
+    for ln in (title_lines or []):
+        s = str(ln).replace("\r", " ").replace("\n", " ").strip()
+        s = " ".join(s.split())          # 연속 공백 정리
+        if s:
+            clean_lines.append(s)
+    if not clean_lines:
+        clean_lines = [" "]              # 완전히 비면 최소 한 줄(공백) 확보
+    title_lines = clean_lines
+
+    # subtitle 도 줄바꿈 제거
+    subtitle = " ".join(str(subtitle).replace("\n", " ").split()) if subtitle else ""
+
     # ── 1) 배경 사진을 4:5로 크롭 ──
     src = Image.open(bg_path).convert("RGB")
     sw, sh = src.size
