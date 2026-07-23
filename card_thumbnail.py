@@ -100,6 +100,7 @@ def make_thumbnail(
     bg_path,
     title_lines,
     subtitle="",
+    credit="",               # 사진 출처 표기. 예: "사진: TechCrunch"
     account="@jinyinacio",
     label="NEWS",
     center_mark="(   N   )",
@@ -114,6 +115,7 @@ def make_thumbnail(
     # 타이틀에는 강조 표시를 쓰지 않는다. 들어오면 마커만 제거.
     title_lines = [t.replace("**", "") for t in _clean_lines(title_lines)] or [""]
     subtitle = _clean(subtitle)
+    credit = _clean(credit).replace("**", "")
     account = _clean(account)
     label = _clean(label)
 
@@ -189,13 +191,25 @@ def make_thumbnail(
             _draw_marked(d, MX, uy + int(34 * ss) + i * sadv,
                          parts, fs, SUBTITLE_GRAY, neon)
 
-    # ── 7) 하단 라인 + 형광 화살표 ──
+    # ── 7) 하단 라인 + 사진 출처 + 형광 화살표 ──
     by = int(ch * 0.915)
     d.line([(MX, by), (cw - MX, by)], fill=WHITE, width=max(1, int(1.4 * ss)))
     fa = _font(6, 42, ss)
     arrow = "→"
     awd = d.textlength(arrow, font=fa)
     d.text((cw - MX - awd, by + int(22 * ss)), arrow, font=fa, fill=neon)    # 형광 포인트 3
+
+    if credit:
+        # 화살표와 같은 줄, 왼쪽에 작게. 길면 자동 축소.
+        csz = 19
+        fcr = _font(4, csz, ss)
+        while csz > 13 and d.textlength(credit, font=fcr) > (cw - MX * 2) - awd - int(30 * ss):
+            csz -= 1
+            fcr = _font(4, csz, ss)
+        casc, cdesc = fcr.getmetrics()
+        aasc, adesc = fa.getmetrics()
+        cy = by + int(22 * ss) + (aasc - casc)          # 화살표 기준선에 맞춤
+        d.text((MX, cy), credit, font=fcr, fill=(146, 146, 148))
 
     # ── 8) 축소 저장 ──
     bg.resize((CANVAS_W, CANVAS_H), Image.LANCZOS).save(out_path)
