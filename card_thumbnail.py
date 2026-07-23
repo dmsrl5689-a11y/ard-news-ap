@@ -126,18 +126,29 @@ def make_thumbnail(
     # ── 1) 배경 사진을 4:5로 크롭 ──
     bg = _prepare_bg(bg_path, cw, ch, crop_bias)
 
-    # ── 2) 상단 살짝 + 하단 강하게 어둡게 (글자 가독성) ──
+    # ── 2) 이미지 밝기를 재서 어둡기를 자동 조절한다 ──
+    #     밝은 사진이 오면 헤더와 제목이 안 보이므로 그만큼 더 덮는다.
+    gray = bg.convert("L")
+    top_lum = sum(gray.crop((0, 0, cw, int(ch * 0.20))).resize((32, 8)).getdata()) / 256
+    mid_lum = sum(gray.crop((0, int(ch * 0.45), cw, ch)).resize((32, 16)).getdata()) / 512
+
+    # 밝을수록 1.0 → 최대 2.0 배까지 강해진다
+    top_boost = 1.0 + max(0.0, (top_lum - 90) / 90)
+    mid_boost = 1.0 + max(0.0, (mid_lum - 90) / 110)
+    top_boost = min(top_boost, 2.0)
+    mid_boost = min(mid_boost, 1.7)
+
     ov = Image.new("L", (cw, ch), 0)
     od = ImageDraw.Draw(ov)
     for y in range(ch):
         a = 0
-        if y < ch * 0.20:                              # 상단 (헤더용)
-            a = int(150 * (1 - y / (ch * 0.20)))
+        if y < ch * 0.30:                              # 상단 (헤더용)
+            a = int(150 * top_boost * (1 - y / (ch * 0.30)))
         bot = 0.46                                     # 하단 그라데이션 시작점
         if y > ch * bot:
             t = (y / ch - bot) / (1 - bot)
-            a = max(a, int(235 * (t ** 0.85)))         # 하단 진하게
-        od.line([(0, y), (cw, y)], fill=a)
+            a = max(a, int(235 * mid_boost * (t ** 0.85)))
+        od.line([(0, y), (cw, y)], fill=min(255, a))
     bg = Image.composite(Image.new("RGB", (cw, ch), (8, 8, 8)), bg, ov)
 
     d = ImageDraw.Draw(bg)
@@ -323,6 +334,7 @@ def make_body(
     subtitle="",              # 형광 바 소제목 (검은 글씨)
     body="",                  # 본문 텍스트. 문자열 또는 리스트. **강조** 가능
     lead="",                  # 첫 문장을 굵게 강조하고 싶을 때 (선택)
+    note="",                  # 하단 각주. 예: "The Verge — 미국 IT 전문 매체" 
     account="@jinyinacio",
     out_path="body.png",
     neon=NEON,
@@ -336,6 +348,8 @@ def make_body(
     image_max_h=660,
     max_lead_lines=1,         # 굵은 첫 문장은 1줄 고정
     max_body_lines=3,         # 설명 본문은 최대 3줄
+    note_size=20,             # 각주 글자 크기
+    max_note_lines=2,         # 각주는 최대 2줄
 ):
     """
     본문 카드를 생성한다.
@@ -352,6 +366,7 @@ def make_body(
     if isinstance(body, (list, tuple)):
         body = " ".join(_clean_lines(body))
     body = _clean(body)
+    note = _clean(note)
     account = _clean(account)
 
     ss = SUPERSAMPLE
@@ -378,6 +393,17 @@ def make_body(
     top_limit = int(ch * 0.075)
     bot_limit = int(ch * 0.875)
     img_gap = int(46 * ss)
+
+    # 각주가 있으면 그만큼 본문 영역을 위로 줄인다
+    note_lines, note_h, note_adv, fn = [], 0, 0, None
+    if note:
+        fn = _font(4, note_size, ss)
+        note_adv = int(note_size * ss * 1.45)
+        note_lines = _cap_lines(_wrap_marked(d, note, fn, maxw - int(26 * ss)),
+                                max_note_lines)
+        nasc, ndesc = fn.getmetrics()
+        note_h = note_adv * (len(note_lines) - 1) + (nasc + ndesc)
+        bot_limit -= note_h + int(38 * ss)
 
     text_budget = (bot_limit - top_limit) - bar_h - bar_gap
     if image_path:
@@ -453,7 +479,17 @@ def make_body(
     for i, parts in enumerate(body_lines):
         _draw_marked(d, MX, y + i * adv, parts, fb, (226, 226, 228), neon)
 
-    # ── 5) 하단 중앙 계정명 ──
+    # ── 5) 하단 각주 ──
+    if note_lines:
+        ny = bot_limit + int(30 * ss)
+        # 형광 세로 바로 시작을 표시한다
+        d.rectangle([MX, ny + int(4 * ss),
+                     MX + int(4 * ss), ny + note_h - int(2 * ss)], fill=neon)
+        for i, parts in enumerate(note_lines):
+            _draw_marked(d, MX + int(20 * ss), ny + i * note_adv,
+                         parts, fn, (152, 152, 155), neon)
+
+    # ── 6) 하단 중앙 계정명 ──
     if account:
         fa = _font(5, 23, ss)
         aw = d.textlength(account, font=fa)
