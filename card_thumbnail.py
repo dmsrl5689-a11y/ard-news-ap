@@ -176,10 +176,18 @@ def make_thumbnail(
 
     # ── 6) 서브타이틀 ──
     if subtitle:
-        fs = _font(5, 27, ss)
-        # **단어** 는 형광색으로 강조된다
-        _draw_marked(d, MX, uy + int(34 * ss), _parse_marks(subtitle),
-                     fs, SUBTITLE_GRAY, neon)
+        # 폭을 넘지 않게 크기를 줄이고, 그래도 길면 2줄로 나눈다
+        ssz = 27
+        fs = _font(5, ssz, ss)
+        while ssz > 20 and d.textlength(subtitle.replace("**", ""), font=fs) > maxw:
+            ssz -= 1
+            fs = _font(5, ssz, ss)
+        sub_lines = _cap_lines(_wrap_marked(d, subtitle, fs, maxw), 2)
+        sasc, sdesc = fs.getmetrics()
+        sadv = int(ssz * ss * 1.42)
+        for i, parts in enumerate(sub_lines):
+            _draw_marked(d, MX, uy + int(34 * ss) + i * sadv,
+                         parts, fs, SUBTITLE_GRAY, neon)
 
     # ── 7) 하단 라인 + 형광 화살표 ──
     by = int(ch * 0.915)
@@ -312,7 +320,7 @@ def make_body(
     line_height=LINE_HEIGHT,
     image_min_h=330,
     image_max_h=660,
-    max_lead_lines=2,         # 굵은 첫 문장은 최대 2줄
+    max_lead_lines=1,         # 굵은 첫 문장은 1줄 고정
     max_body_lines=3,         # 설명 본문은 최대 3줄
 ):
     """
