@@ -111,7 +111,8 @@ def make_thumbnail(
     crop_bias=0.30,          # 세로 사진일 때 위쪽을 얼마나 살릴지 (0=위, 1=아래)
 ):
     """카드뉴스 표지 썸네일을 생성해 out_path 에 저장한다."""
-    title_lines = _clean_lines(title_lines) or [""]
+    # 타이틀에는 강조 표시를 쓰지 않는다. 들어오면 마커만 제거.
+    title_lines = [t.replace("**", "") for t in _clean_lines(title_lines)] or [""]
     subtitle = _clean(subtitle)
     account = _clean(account)
     label = _clean(label)
@@ -176,7 +177,9 @@ def make_thumbnail(
     # ── 6) 서브타이틀 ──
     if subtitle:
         fs = _font(5, 27, ss)
-        d.text((MX, uy + int(34 * ss)), subtitle, font=fs, fill=SUBTITLE_GRAY)
+        # **단어** 는 형광색으로 강조된다
+        _draw_marked(d, MX, uy + int(34 * ss), _parse_marks(subtitle),
+                     fs, SUBTITLE_GRAY, neon)
 
     # ── 7) 하단 라인 + 형광 화살표 ──
     by = int(ch * 0.915)
@@ -281,6 +284,18 @@ def _wrap_marked(d, text, font, maxw):
     return out
 
 
+def _cap_lines(lines, limit):
+    """줄 수가 상한을 넘으면 잘라내고 마지막 줄에 말줄임표를 붙인다."""
+    if len(lines) <= limit:
+        return lines
+    cut = lines[:limit]
+    last = list(cut[-1])
+    if last and not last[-1][0].rstrip().endswith(("…", ".", "!", "?")):
+        last[-1] = (last[-1][0].rstrip() + "…", last[-1][1])
+    cut[-1] = last
+    return cut
+
+
 def make_body(
     image_path,               # 본문 내용과 어울리는 이미지 (없으면 None)
     subtitle="",              # 형광 바 소제목 (검은 글씨)
@@ -297,6 +312,8 @@ def make_body(
     line_height=LINE_HEIGHT,
     image_min_h=330,
     image_max_h=660,
+    max_lead_lines=2,         # 굵은 첫 문장은 최대 2줄
+    max_body_lines=3,         # 설명 본문은 최대 3줄
 ):
     """
     본문 카드를 생성한다.
@@ -307,7 +324,8 @@ def make_body(
     - **단어** 로 감싸면 형광색 강조
     - 하단 중앙에 계정명, 구분선 없음
     """
-    subtitle = _clean(subtitle)
+    # 소제목은 무조건 한 줄. 강조 마커도 쓰지 않는다.
+    subtitle = _clean(subtitle).replace("**", "")
     lead = _clean(lead)
     if isinstance(body, (list, tuple)):
         body = " ".join(_clean_lines(body))
@@ -323,8 +341,12 @@ def make_body(
     d = ImageDraw.Draw(canvas)
 
     # ── 1) 소제목 바 크기 ──
-    fs = _font(9, subtitle_size, ss)
     pad_x, pad_y = int(19 * ss), int(12 * ss)
+    ssize = subtitle_size
+    fs = _font(9, ssize, ss)
+    while subtitle and ssize > 22 and d.textlength(subtitle, font=fs) > maxw - pad_x * 2:
+        ssize -= 2
+        fs = _font(9, ssize, ss)
     sasc, sdesc = fs.getmetrics()
     sw_ = d.textlength(subtitle, font=fs) if subtitle else 0
     bar_h = (sasc + sdesc) + pad_y * 2 if subtitle else 0
@@ -360,9 +382,23 @@ def make_body(
         if body_lines:
             text_h += adv * (len(body_lines) - 1) + (basc + bdesc)
 
-        if text_h <= text_budget or bsize <= min_body_size:
+        fits = (text_h <= text_budget
+                and len(lead_lines) <= max_lead_lines
+                and len(body_lines) <= max_body_lines)
+        if fits or bsize <= min_body_size:
             break
         bsize -= 2
+
+    # 최소 크기에서도 넘치면 강제로 잘라낸다
+    lead_lines = _cap_lines(lead_lines, max_lead_lines)
+    body_lines = _cap_lines(body_lines, max_body_lines)
+    text_h = 0
+    if lead_lines:
+        text_h += lead_adv * (len(lead_lines) - 1) + (lasc + ldesc)
+        if body_lines:
+            text_h += int(bsize * ss * 0.75)
+    if body_lines:
+        text_h += adv * (len(body_lines) - 1) + (basc + bdesc)
 
     # ── 3) 이미지 높이는 남는 공간으로 ──
     img_card, img_h = None, 0
