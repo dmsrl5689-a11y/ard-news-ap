@@ -593,3 +593,93 @@ def make_cta(
 
     canvas.resize((CANVAS_W, CANVAS_H), Image.LANCZOS).save(out_path)
     return out_path
+
+
+# ══════════════════════════════════════════════════════════════
+#  4) 브릿지 페이지 (CTA 직전, 이미지 없이 텍스트 두 줄)
+# ══════════════════════════════════════════════════════════════
+
+def make_bridge(
+    summary,                  # 내용을 한 줄로 요약
+    question,                 # 독자에게 던지는 질문 한 줄
+    account="@jinyinacio",
+    out_path="bridge.png",
+    neon=NEON,
+    bg_color=BG_DARK,
+    summary_size=48,
+    question_size=40,
+    min_size=30,
+):
+    """
+    이미지 없이 텍스트만 있는 쉼표 같은 페이지.
+    위: 요약(굵은 흰 글씨) / 아래: 질문(형광)
+    가운데 형광 구분선이 들어간다.
+    """
+    summary = _clean(summary)
+    question = _clean(question)
+    account = _clean(account)
+
+    ss = SUPERSAMPLE
+    cw, ch = CANVAS_W * ss, CANVAS_H * ss
+    MX = int(SIDE_MARGIN * 1.15) * ss
+    maxw = cw - MX * 2
+
+    canvas = Image.new("RGB", (cw, ch), bg_color)
+    d = ImageDraw.Draw(canvas)
+
+    # ── 요약: 3줄 안에 들어갈 때까지 축소 ──
+    ssz = summary_size
+    while ssz > min_size:
+        fs = _font(8, ssz, ss)
+        s_lines = _wrap_marked(d, summary, fs, maxw) if summary else []
+        if len(s_lines) <= 3:
+            break
+        ssz -= 2
+    fs = _font(8, ssz, ss)
+    s_lines = _cap_lines(_wrap_marked(d, summary, fs, maxw), 3) if summary else []
+    s_adv = int(ssz * ss * 1.46)
+    sasc, sdesc = fs.getmetrics()
+    s_h = (s_adv * (len(s_lines) - 1) + (sasc + sdesc)) if s_lines else 0
+
+    # ── 질문: 3줄 안에 들어갈 때까지 축소 ──
+    qsz = question_size
+    while qsz > min_size:
+        fq = _font(6, qsz, ss)
+        q_lines = _wrap_marked(d, question, fq, maxw) if question else []
+        if len(q_lines) <= 3:
+            break
+        qsz -= 2
+    fq = _font(6, qsz, ss)
+    q_lines = _cap_lines(_wrap_marked(d, question, fq, maxw), 3) if question else []
+    q_adv = int(qsz * ss * 1.46)
+    qasc, qdesc = fq.getmetrics()
+    q_h = (q_adv * (len(q_lines) - 1) + (qasc + qdesc)) if q_lines else 0
+
+    # ── 전체 블록 세로 중앙 정렬 ──
+    rule_gap = int(52 * ss)
+    rule_h = int(6 * ss)
+    block_h = s_h + rule_gap + rule_h + rule_gap + q_h
+    y = int((ch - block_h) / 2) - int(40 * ss)
+
+    for i, parts in enumerate(s_lines):
+        w = sum(d.textlength(t, font=fs) for t, _ in parts)
+        _draw_marked(d, (cw - w) / 2, y + i * s_adv, parts, fs, WHITE, neon)
+    y += s_h + rule_gap
+
+    # 가운데 형광 구분선
+    rw = int(90 * ss)
+    d.rectangle([(cw - rw) / 2, y, (cw + rw) / 2, y + rule_h], fill=neon)
+    y += rule_h + rule_gap
+
+    for i, parts in enumerate(q_lines):
+        w = sum(d.textlength(t, font=fq) for t, _ in parts)
+        _draw_marked(d, (cw - w) / 2, y + i * q_adv, parts, fq, neon, WHITE)
+
+    # ── 하단 중앙 계정명 ──
+    if account:
+        fa = _font(5, 23, ss)
+        aw = d.textlength(account, font=fa)
+        d.text(((cw - aw) / 2, int(ch * 0.925)), account, font=fa, fill=(148, 148, 150))
+
+    canvas.resize((CANVAS_W, CANVAS_H), Image.LANCZOS).save(out_path)
+    return out_path

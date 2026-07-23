@@ -16,7 +16,7 @@ import traceback
 from flask import Flask, request, jsonify
 
 import card_thumbnail
-from card_thumbnail import make_thumbnail, make_body, make_cta
+from card_thumbnail import make_thumbnail, make_body, make_cta, make_bridge
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -62,7 +62,7 @@ def _cleanup(*paths):
 def health():
     return jsonify({
         "status": "ok",
-        "endpoints": ["/thumbnail", "/body", "/cta"]
+        "endpoints": ["/thumbnail", "/body", "/bridge", "/cta"]
     })
 
 
@@ -115,6 +115,29 @@ def body():
         return jsonify({"error": str(e)}), 500
     finally:
         _cleanup(img_path, out_path)
+
+
+@app.route("/bridge", methods=["POST"])
+def bridge():
+    """브릿지 카드. payload: summary, question, account"""
+    out_path = None
+    try:
+        data = request.get_json(force=True) or {}
+        out_path = tempfile.NamedTemporaryFile(suffix=".png", delete=False).name
+
+        make_bridge(
+            summary=data.get("summary", ""),
+            question=data.get("question", ""),
+            account=data.get("account", "@jinyinacio"),
+            out_path=out_path,
+        )
+        return jsonify({"image_base64": _read_as_b64(out_path)})
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        _cleanup(out_path)
 
 
 @app.route("/cta", methods=["POST"])
