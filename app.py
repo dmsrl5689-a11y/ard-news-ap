@@ -16,7 +16,8 @@ import traceback
 from flask import Flask, request, jsonify
 
 import card_thumbnail
-from card_thumbnail import make_thumbnail, make_body, make_cta, make_bridge
+from card_thumbnail import (make_thumbnail, make_body, make_cta, make_bridge,
+                            hex_to_rgb, NEON, BG_DARK)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -79,7 +80,10 @@ def thumbnail():
             bg_path=bg_path,
             title_lines=data.get("title_lines") or [""],
             subtitle=data.get("subtitle", ""),
+            credit=data.get("credit", ""),
+            label=data.get("label", "NEWS"),
             account=data.get("account", "@jinyinacio"),
+            neon=hex_to_rgb(data.get("accent"), NEON),
             out_path=out_path,
         )
         return jsonify({"image_base64": _read_as_b64(out_path)})
@@ -105,7 +109,10 @@ def body():
             subtitle=data.get("subtitle", ""),
             lead=data.get("lead", ""),
             body=data.get("body", ""),
+            note=data.get("note", ""),
             account=data.get("account", "@jinyinacio"),
+            neon=hex_to_rgb(data.get("accent"), NEON),
+            bg_color=hex_to_rgb(data.get("bg"), BG_DARK),
             out_path=out_path,
         )
         return jsonify({"image_base64": _read_as_b64(out_path)})
@@ -129,6 +136,8 @@ def bridge():
             summary=data.get("summary", ""),
             question=data.get("question", ""),
             account=data.get("account", "@jinyinacio"),
+            neon=hex_to_rgb(data.get("accent"), NEON),
+            bg_color=hex_to_rgb(data.get("bg"), BG_DARK),
             out_path=out_path,
         )
         return jsonify({"image_base64": _read_as_b64(out_path)})
@@ -151,6 +160,8 @@ def cta():
         make_cta(
             profile_path=CTA_PROFILE if os.path.exists(CTA_PROFILE) else None,
             account=data.get("account", "@jinyinacio"),
+            neon=hex_to_rgb(data.get("accent"), NEON),
+            bg_color=hex_to_rgb(data.get("bg"), BG_DARK),
             out_path=out_path,
         )
         return jsonify({"image_base64": _read_as_b64(out_path)})

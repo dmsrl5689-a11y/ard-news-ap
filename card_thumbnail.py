@@ -38,6 +38,19 @@ def _font(weight, size, ss):
     return ImageFont.truetype(FONT_TPL.format(weight), size * ss)
 
 
+def hex_to_rgb(value, fallback):
+    """'#4CAD9D' 또는 '4CAD9D' 를 (76,173,157) 로 바꾼다. 실패하면 fallback."""
+    try:
+        h = str(value or "").strip().lstrip("#")
+        if len(h) == 3:
+            h = "".join(c * 2 for c in h)
+        if len(h) != 6:
+            return fallback
+        return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+    except Exception:
+        return fallback
+
+
 def _clean(text):
     """개행/탭이 섞여 들어오면 PIL textlength가 터지므로 미리 한 줄로 정리한다."""
     return re.sub(r"\s+", " ", str(text or "")).strip()
